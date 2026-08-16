@@ -1,0 +1,19 @@
+{
+  "name": "social-suite",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:worker": "npm run dev --workspace=apps/worker",
+    "db:generate": "npm run generate --workspace=packages/db",
+    "db:migrate": "npm run migrate --workspace=packages/db",
+    "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/db && npm run build --workspace=packages/platforms && npm run build --workspace=packages/queue && npm run build --workspace=apps/web && npm run build --workspace=apps/worker"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

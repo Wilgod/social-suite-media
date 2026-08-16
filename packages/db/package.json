@@ -1,0 +1,24 @@
+{
+  "name": "@social-suite/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "studio": "prisma studio",
+    "build": "prisma generate && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.9.1",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@social-suite/core": "*"
+  },
+  "devDependencies": {
+    "prisma": "^7.9.1",
+    "dotenv": "^17.4.2",
+    "typescript": "^7.0.2"
+  }
+}

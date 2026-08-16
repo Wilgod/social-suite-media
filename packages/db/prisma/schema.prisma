@@ -1,0 +1,280 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrgRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+enum Platform {
+  youtube
+  facebook
+  instagram
+  threads
+  x
+}
+
+/**
+ * OAuth apps are registered once per provider. Meta covers facebook only — Instagram uses
+ * "Instagram API with Instagram Login", which has its own separate app ID/secret from Facebook's.
+ */
+enum OAuthProvider {
+  google
+  meta
+  instagram
+  threads
+  x
+}
+
+enum SocialAccountStatus {
+  active
+  expired
+  revoked
+  error
+}
+
+enum PostStatus {
+  draft
+  scheduled
+  publishing
+  partially_published
+  published
+  failed
+  canceled
+}
+
+enum PostTargetStatus {
+  pending
+  queued
+  publishing
+  success
+  failed
+  skipped
+}
+
+model Organization {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  planId           String?
+  stripeCustomerId String?
+  createdAt        DateTime @default(now())
+
+  memberships            Membership[]
+  socialAccounts         SocialAccount[]
+  posts                  Post[]
+  mediaAssets            MediaAsset[]
+  auditLogs              AuditLog[]
+  platformAppCredentials PlatformAppCredential[]
+  analyticsSnapshots     AnalyticsSnapshot[]
+
+  @@map("organizations")
+}
+
+model PlatformAppCredential {
+  id                    String        @id @default(cuid())
+  organizationId        String
+  provider              OAuthProvider
+  clientId              String
+  encryptedClientSecret String
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@map("platform_app_credentials")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+
+  memberships       Membership[]
+  connectedAccounts SocialAccount[] @relation("ConnectedBy")
+  createdPosts      Post[]          @relation("CreatedBy")
+  uploadedMedia     MediaAsset[]    @relation("UploadedBy")
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           OrgRole  @default(editor)
+  invitedAt      DateTime @default(now())
+  acceptedAt     DateTime?
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+model SocialAccount {
+  id                String              @id @default(cuid())
+  organizationId    String
+  platform          Platform
+  platformAccountId String
+  displayName       String
+  avatarUrl         String?
+  status            SocialAccountStatus @default(active)
+  platformMetadata  Json?
+  connectedByUserId String?
+  connectedAt       DateTime            @default(now())
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectedBy       User?              @relation("ConnectedBy", fields: [connectedByUserId], references: [id], onDelete: SetNull)
+  credential        OAuthCredential?
+  postTargets       PostTarget[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@unique([organizationId, platform, platformAccountId])
+  @@index([organizationId])
+  @@map("social_accounts")
+}
+
+model AnalyticsSnapshot {
+  id                      String   @id @default(cuid())
+  organizationId          String
+  socialAccountId         String
+  date                    DateTime
+  views                   Int      @default(0)
+  likes                   Int      @default(0)
+  comments                Int      @default(0)
+  subscribersGained       Int      @default(0)
+  subscribersLost         Int      @default(0)
+  estimatedMinutesWatched Int      @default(0)
+  createdAt               DateTime @default(now())
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([socialAccountId, date])
+  @@index([organizationId, date])
+  @@map("analytics_snapshots")
+}
+
+model OAuthCredential {
+  id                  String    @id @default(cuid())
+  socialAccountId     String    @unique
+  encryptedAccessToken  String
+  encryptedRefreshToken String?
+  tokenExpiresAt      DateTime?
+  scopesGranted       String[]
+  lastRefreshedAt     DateTime?
+
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@map("oauth_credentials")
+}
+
+model Post {
+  id             String     @id @default(cuid())
+  organizationId String
+  createdByUserId String?
+  status         PostStatus @default(draft)
+  baseContent    String
+  scheduledAt    DateTime?
+  timezone       String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("CreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  targets      PostTarget[]
+
+  @@index([organizationId, scheduledAt])
+  @@map("posts")
+}
+
+model PostTarget {
+  id                     String            @id @default(cuid())
+  organizationId         String
+  postId                 String
+  socialAccountId        String
+  platform               Platform
+  platformSpecificContent Json?
+  status                 PostTargetStatus  @default(pending)
+  externalPostId         String?
+  errorCode              String?
+  errorMessage           String?
+  attemptCount           Int               @default(0)
+  lastAttemptedAt        DateTime?
+  publishedAt            DateTime?
+
+  post          Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount     @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  media         PostTargetMedia[]
+
+  @@index([postId])
+  @@index([socialAccountId])
+  @@index([organizationId])
+  @@map("post_targets")
+}
+
+model MediaAsset {
+  id             String   @id @default(cuid())
+  organizationId String
+  uploadedByUserId String?
+  storageUrl     String
+  mimeType       String
+  fileSize       Int
+  width          Int?
+  height         Int?
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User?             @relation("UploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  postTargets  PostTargetMedia[]
+
+  @@index([organizationId])
+  @@map("media_assets")
+}
+
+model PostTargetMedia {
+  id           String @id @default(cuid())
+  postTargetId String
+  mediaAssetId String
+  order        Int    @default(0)
+
+  postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([postTargetId, mediaAssetId])
+  @@map("post_target_media")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
+}
