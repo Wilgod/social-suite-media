@@ -9,6 +9,11 @@ const PLATFORM_LABELS: Record<string, string> = {
   instagram: "Instagram",
   threads: "Threads",
   x: "X",
+  tiktok: "TikTok",
+  douyin: "Douyin",
+  bilibili: "Bilibili",
+  weibo: "Weibo",
+  xiaohongshu: "Xiaohongshu",
 };
 
 const POST_STATUS_STYLES: Record<PostStatus, string> = {
@@ -50,12 +55,25 @@ export default async function PostsPage() {
     }),
   ]);
 
+  const draftCount = posts.filter((post) => post.status === "draft").length;
+  const scheduledCount = posts.filter((post) => post.status === "scheduled" || post.status === "publishing").length;
+  const publishedCount = posts.filter((post) => post.status === "published" || post.status === "partially_published").length;
+  const failedCount = posts.filter((post) => post.status === "failed").length;
+
   return (
-    <div className="max-w-3xl p-8">
+    <div className="p-6 lg:p-8">
       <h1 className="text-lg font-semibold text-neutral-900">Posts</h1>
       <p className="mt-1 text-sm text-neutral-500">Compose once, publish across your connected accounts.</p>
 
-      <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-5">
+      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <PostStat label="Drafts" value={draftCount} />
+        <PostStat label="Scheduled" value={scheduledCount} />
+        <PostStat label="Published" value={publishedCount} />
+        <PostStat label="Failed" value={failedCount} />
+      </div>
+
+      <div className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+      <div className="rounded-2xl border border-white bg-white p-5 shadow-[0_10px_30px_-20px_rgba(76,29,149,0.45)]">
         {accounts.length === 0 ? (
           <p className="text-sm text-neutral-500">
             No connected accounts yet.{" "}
@@ -206,11 +224,11 @@ export default async function PostsPage() {
         )}
       </div>
 
-      <div className="mt-8 space-y-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
         {posts.length === 0 && <p className="text-sm text-neutral-400">No posts yet.</p>}
 
         {posts.map((post) => (
-          <div key={post.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
+          <div key={post.id} className="rounded-2xl border border-white bg-white p-5 shadow-[0_10px_30px_-20px_rgba(76,29,149,0.45)]">
             <div className="flex items-start justify-between gap-4">
               <p className="text-sm text-neutral-900">{post.baseContent}</p>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${POST_STATUS_STYLES[post.status]}`}>
@@ -246,6 +264,16 @@ export default async function PostsPage() {
           </div>
         ))}
       </div>
+      </div>
+    </div>
+  );
+}
+
+function PostStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-white bg-white p-4 shadow-[0_10px_30px_-20px_rgba(76,29,149,0.45)]">
+      <p className="text-xs font-medium text-neutral-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900">{value}</p>
     </div>
   );
 }

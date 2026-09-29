@@ -1,9 +1,14 @@
 import { PrismaClient } from "./generated/prisma/client";
+import { OAuthProvider, Platform } from "./generated/prisma/enums";
 import { PrismaPg } from "@prisma/adapter-pg";
+
+const schemaFingerprint = `${Object.keys(Platform).join(",")}|${Object.keys(OAuthProvider).join(",")}`;
 
 declare global {
   // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;
+  // eslint-disable-next-line no-var
+  var __prismaSchema: string | undefined;
 }
 
 function createClient(): PrismaClient {
@@ -15,8 +20,12 @@ function createClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalThis.__prisma ?? createClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalThis.__prisma = prisma;
+function getClient(): PrismaClient {
+  if (!globalThis.__prisma || globalThis.__prismaSchema !== schemaFingerprint) {
+    globalThis.__prisma = createClient();
+    globalThis.__prismaSchema = schemaFingerprint;
+  }
+  return globalThis.__prisma;
 }
+
+export const prisma = getClient();

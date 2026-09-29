@@ -11,3 +11,5 @@ packages/db/src/generated/
 .turbo/
 coverage/
 certs/
+
+data/media/

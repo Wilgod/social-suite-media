@@ -56,6 +56,18 @@ The homepage (`/`) is a bare scaffold with no navigation. To sign in or create a
 
 There is no seeded/default account and no password-reset flow yet — sign up to create the first account.
 
+## Video publishing platforms
+
+The worker publishes each `PostTarget` through a `PlatformAdapter`. Current coverage:
+
+- **YouTube / Instagram** — existing production adapters
+- **Facebook** — Page OAuth, video publish via Graph `file_url`, comments and view/like/share metrics
+- **Xiaohongshu** — official OAuth skeleton; silent note publish waits on approved content capabilities
+- **Bilibili** — OAuth skeleton; chunked archive upload is the next wiring step
+- **Douyin** — OAuth skeleton; silent publish waits on `video.create.bind` approval
+
+Per-post metrics and comments are stored in `post_target_metric_snapshots` / `post_comments` and refreshed every 15 minutes.
+
 ## Other scripts
 
 - `npm run db:migrate` — run Prisma migrations (dev)

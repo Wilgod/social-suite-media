@@ -1,4 +1,6 @@
 import type { ContentFormat, ContentFormatStat, ContentItem, DailyStat, NormalizedTokenResult, PlatformAdapter } from "@social-suite/core";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -21,6 +23,14 @@ function toDateString(date: Date): string {
 }
 
 const SHORT_FORM_MAX_SECONDS = 60;
+
+function localMediaPath(url: string): string | null {
+  const marker = "/api/media/file/";
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  const key = decodeURIComponent(url.slice(index + marker.length)).replace(/\.{2}/g, "");
+  return path.resolve(process.cwd(), "../../data/media", key);
+}
 
 /** Parses an ISO 8601 duration (e.g. "PT1M30S") into whole seconds. */
 function parseIsoDuration(duration: string): number {
@@ -147,16 +157,22 @@ export const youtubeAdapter: PlatformAdapter = {
     }
 
     try {
-      const mediaRes = await fetch(video.url);
-      if (!mediaRes.ok) {
-        return {
-          success: false,
-          errorKind: "transient",
-          errorCode: "media_fetch_failed",
-          errorMessage: `Failed to download media (${mediaRes.status})`,
-        };
+      const localPath = localMediaPath(video.url);
+      let videoBytes: ArrayBuffer | Uint8Array;
+      if (localPath) {
+        videoBytes = await readFile(localPath);
+      } else {
+        const mediaRes = await fetch(video.url);
+        if (!mediaRes.ok) {
+          return {
+            success: false,
+            errorKind: "transient",
+            errorCode: "media_fetch_failed",
+            errorMessage: `Failed to download media (${mediaRes.status})`,
+          };
+        }
+        videoBytes = await mediaRes.arrayBuffer();
       }
-      const videoBytes = await mediaRes.arrayBuffer();
 
       const specific = (target.platformSpecific ?? {}) as {
         title?: string;
@@ -208,7 +224,9 @@ export const youtubeAdapter: PlatformAdapter = {
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": video.mimeType, "Content-Length": String(videoBytes.byteLength) },
-        body: videoBytes,
+        // Copy into an ArrayBuffer-backed view. TypeScript's DOM fetch types reject
+        // Uint8Array<ArrayBufferLike> because it could be backed by SharedArrayBuffer.
+        body: new Uint8Array(videoBytes),
       });
 
       if (!uploadRes.ok) {
@@ -349,6 +367,7 @@ export const youtubeAdapter: PlatformAdapter = {
           comments: stats?.commentCount !== undefined ? Number(stats.commentCount) : undefined,
           durationSeconds,
           isShortForm: durationSeconds !== undefined ? durationSeconds <= SHORT_FORM_MAX_SECONDS : undefined,
+          mediaKind: durationSeconds !== undefined && durationSeconds <= SHORT_FORM_MAX_SECONDS ? "short" : "video",
         } satisfies ContentItem;
       })
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());

@@ -14,7 +14,7 @@ const TITLES: Record<string, string> = {
 
 export function Header() {
   const pathname = usePathname();
-  const title = TITLES[pathname] ?? "Dashboard";
+  const title = pathname.startsWith("/dashboard/analytics") ? "Analytics" : (TITLES[pathname] ?? "Dashboard");
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-6">

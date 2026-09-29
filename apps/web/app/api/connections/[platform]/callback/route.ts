@@ -4,7 +4,8 @@ import { getAdapter, hasAdapter } from "@social-suite/platforms";
 import { prisma, getPlatformAppCredentials, type Prisma } from "@social-suite/db";
 
 function redirectToConnections(request: NextRequest, query: string) {
-  return NextResponse.redirect(new URL(`/dashboard/connections?${query}`, request.url));
+  const base = process.env.NEXTAUTH_URL ?? request.url;
+  return NextResponse.redirect(new URL(`/dashboard/connections?${query}`, base));
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
@@ -39,10 +40,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const tokens = await adapter.exchangeCodeForTokens(code, appCredentials, state.pkceVerifier);
-    const identities = await adapter.fetchAccountIdentity(tokens.accessToken);
+    let identities: Awaited<ReturnType<typeof adapter.fetchAccountIdentity>>;
+    try {
+      identities = await adapter.fetchAccountIdentity(tokens.accessToken);
+    } catch (err) {
+      if (!tokens.accountId) throw err;
+      identities = {
+        externalId: tokens.accountId,
+        displayName: tokens.accountName ?? tokens.accountId,
+      };
+    }
     const identityList = Array.isArray(identities) ? identities : [identities];
+    if (identityList.length === 0 && tokens.accountId) {
+      identityList.push({
+        externalId: tokens.accountId,
+        displayName: tokens.accountName ?? tokens.accountId,
+      });
+    }
 
     for (const identity of identityList) {
+      const accountAccessToken = identity.accessToken ?? tokens.accessToken;
+      const pageCredential = platform === "facebook" && Boolean(identity.accessToken);
       const socialAccount = await prisma.socialAccount.upsert({
         where: {
           organizationId_platform_platformAccountId: {
@@ -73,15 +91,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         where: { socialAccountId: socialAccount.id },
         create: {
           socialAccountId: socialAccount.id,
-          encryptedAccessToken: encryptSecret(tokens.accessToken),
-          encryptedRefreshToken: tokens.refreshToken ? encryptSecret(tokens.refreshToken) : undefined,
-          tokenExpiresAt: tokens.expiresAt,
+          encryptedAccessToken: encryptSecret(accountAccessToken),
+          encryptedRefreshToken: pageCredential ? undefined : tokens.refreshToken ? encryptSecret(tokens.refreshToken) : undefined,
+          tokenExpiresAt: pageCredential ? undefined : tokens.expiresAt,
           scopesGranted: tokens.scopes,
         },
         update: {
-          encryptedAccessToken: encryptSecret(tokens.accessToken),
-          encryptedRefreshToken: tokens.refreshToken ? encryptSecret(tokens.refreshToken) : undefined,
-          tokenExpiresAt: tokens.expiresAt,
+          encryptedAccessToken: encryptSecret(accountAccessToken),
+          encryptedRefreshToken: pageCredential ? null : tokens.refreshToken ? encryptSecret(tokens.refreshToken) : null,
+          tokenExpiresAt: pageCredential ? null : tokens.expiresAt,
           scopesGranted: tokens.scopes,
           lastRefreshedAt: new Date(),
         },

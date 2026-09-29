@@ -2,6 +2,7 @@ import { PgBoss } from "pg-boss";
 
 export const PUBLISH_POST_TARGET_QUEUE = "publish-post-target";
 export const SYNC_ANALYTICS_QUEUE = "sync-analytics";
+export const SYNC_POST_METRICS_QUEUE = "sync-post-metrics";
 
 let bossInstance: PgBoss | undefined;
 
@@ -19,9 +20,11 @@ export async function getBoss(): Promise<PgBoss> {
   await boss.start();
   await boss.createQueue(PUBLISH_POST_TARGET_QUEUE);
   await boss.createQueue(SYNC_ANALYTICS_QUEUE);
+  await boss.createQueue(SYNC_POST_METRICS_QUEUE);
 
   // Daily at 06:00 UTC.
   await boss.schedule(SYNC_ANALYTICS_QUEUE, "0 6 * * *", {});
+  await boss.schedule(SYNC_POST_METRICS_QUEUE, "*/15 * * * *", {});
 
   bossInstance = boss;
   return boss;

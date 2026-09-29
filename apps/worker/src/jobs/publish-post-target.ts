@@ -1,5 +1,5 @@
-import { decryptSecret, derivePostStatus } from "@social-suite/core";
-import type { PostTargetStatus } from "@social-suite/core";
+import { decryptSecret, derivePostStatus, metaMediaUrl } from "@social-suite/core";
+import type { PostTargetStatus, PublishResult } from "@social-suite/core";
 import { prisma } from "@social-suite/db";
 import { getAdapter } from "@social-suite/platforms";
 import { getValidAccessToken } from "../lib/access-token";
@@ -49,31 +49,38 @@ export async function handlePublishPostTarget(data: PublishPostTargetJobData): P
     data: { status: "publishing", attemptCount: { increment: 1 }, lastAttemptedAt: new Date() },
   });
 
-  const adapter = getAdapter(target.platform);
-
-  let accessToken: string;
-  try {
-    accessToken = await getValidAccessToken(socialAccount.organizationId, target.platform, credential);
-  } catch (err) {
-    await prisma.socialAccount.update({ where: { id: socialAccount.id }, data: { status: "expired" } });
-    await failPermanently(
-      target.id,
-      target.postId,
-      "token_refresh_failed",
-      err instanceof Error ? err.message : "Token refresh failed; account needs to be reconnected.",
-    );
-    return;
-  }
-
   const platformSpecific = (target.platformSpecificContent ?? {}) as { content?: string };
+  const accountMetadata = socialAccount.platformMetadata as Record<string, unknown> | undefined;
+  let result: PublishResult;
 
-  const result = await adapter.publish(
+  if (accountMetadata?.demoMode === true) {
+    // Run the real queue/status pipeline while deliberately avoiding external APIs.
+    result = { success: true, externalPostId: `demo_${target.platform}_${target.id}` };
+  } else {
+    const adapter = getAdapter(target.platform);
+    let accessToken: string;
+    try {
+      accessToken = await getValidAccessToken(socialAccount.organizationId, target.platform, credential);
+    } catch (err) {
+      await prisma.socialAccount.update({ where: { id: socialAccount.id }, data: { status: "expired" } });
+      await failPermanently(
+        target.id,
+        target.postId,
+        "token_refresh_failed",
+        err instanceof Error ? err.message : "Token refresh failed; account needs to be reconnected.",
+      );
+      return;
+    }
+
+    result = await adapter.publish(
     {
       postTargetId: target.id,
       externalAccountId: socialAccount.platformAccountId,
       content: platformSpecific.content ?? post.baseContent,
       media: target.media.map((m) => ({
-        url: m.mediaAsset.storageUrl,
+        url: ["facebook", "instagram", "threads"].includes(target.platform)
+          ? metaMediaUrl(m.mediaAsset.storageUrl, process.env.OAUTH_PUBLIC_BASE_URL ?? "")
+          : m.mediaAsset.storageUrl,
         mimeType: m.mediaAsset.mimeType,
         order: m.order,
       })),
@@ -83,14 +90,22 @@ export async function handlePublishPostTarget(data: PublishPostTargetJobData): P
       accessToken,
       refreshToken: credential.encryptedRefreshToken ? decryptSecret(credential.encryptedRefreshToken) : undefined,
       expiresAt: credential.tokenExpiresAt ?? undefined,
-      accountMetadata: socialAccount.platformMetadata as Record<string, unknown> | undefined,
+      accountMetadata,
     },
-  );
+    );
+  }
 
   if (result.success) {
     await prisma.postTarget.update({
       where: { id: target.id },
-      data: { status: "success", externalPostId: result.externalPostId, publishedAt: new Date(), errorCode: null, errorMessage: null },
+      data: {
+        status: "success",
+        externalPublishId: result.externalPublishId,
+        externalPostId: result.externalPostId,
+        publishedAt: new Date(),
+        errorCode: null,
+        errorMessage: null,
+      },
     });
     await recomputePostStatus(target.postId);
     return;

@@ -21,6 +21,11 @@ enum Platform {
   instagram
   threads
   x
+  douyin
+  bilibili
+  weibo
+  xiaohongshu
+  tiktok
 }
 
 /**
@@ -33,6 +38,11 @@ enum OAuthProvider {
   instagram
   threads
   x
+  douyin
+  bilibili
+  weibo
+  xiaohongshu
+  tiktok
 }
 
 enum SocialAccountStatus {
@@ -158,6 +168,8 @@ model AnalyticsSnapshot {
   views                   Int      @default(0)
   likes                   Int      @default(0)
   comments                Int      @default(0)
+  shares                  Int      @default(0)
+  favorites               Int      @default(0)
   subscribersGained       Int      @default(0)
   subscribersLost         Int      @default(0)
   estimatedMinutesWatched Int      @default(0)
@@ -212,6 +224,7 @@ model PostTarget {
   platform               Platform
   platformSpecificContent Json?
   status                 PostTargetStatus  @default(pending)
+  externalPublishId      String?
   externalPostId         String?
   errorCode              String?
   errorMessage           String?
@@ -222,11 +235,54 @@ model PostTarget {
   post          Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
   socialAccount SocialAccount     @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   media         PostTargetMedia[]
+  metrics       PostTargetMetricSnapshot[]
+  comments      PostComment[]
 
   @@index([postId])
   @@index([socialAccountId])
   @@index([organizationId])
+  @@index([externalPostId])
   @@map("post_targets")
+}
+
+model PostTargetMetricSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  postTargetId   String
+  capturedAt     DateTime @default(now())
+  views          Int      @default(0)
+  likes          Int      @default(0)
+  comments       Int      @default(0)
+  shares         Int      @default(0)
+  favorites      Int      @default(0)
+  coins          Int      @default(0)
+  extra          Json?
+
+  postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
+
+  @@index([postTargetId, capturedAt])
+  @@index([organizationId, capturedAt])
+  @@map("post_target_metric_snapshots")
+}
+
+model PostComment {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  postTargetId       String
+  externalCommentId  String
+  parentExternalId   String?
+  authorExternalId   String?
+  authorName         String
+  body               String
+  likeCount          Int       @default(0)
+  publishedAt        DateTime?
+  fetchedAt          DateTime  @default(now())
+
+  postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
+
+  @@unique([postTargetId, externalCommentId])
+  @@index([organizationId, fetchedAt])
+  @@map("post_comments")
 }
 
 model MediaAsset {

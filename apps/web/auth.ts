@@ -4,6 +4,7 @@ import { compare } from "bcryptjs";
 import { prisma } from "@social-suite/db";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [

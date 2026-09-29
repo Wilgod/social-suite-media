@@ -38,7 +38,7 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-neutral-200 bg-white">
+    <aside className="sticky top-0 flex h-screen w-[clamp(17.5rem,18vw,28rem)] shrink-0 flex-col border-r border-neutral-200 bg-white">
       <div className="flex items-center gap-2.5 px-5 py-5">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-violet-500 text-sm font-bold text-white">
           S

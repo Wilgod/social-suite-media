@@ -38,6 +38,12 @@ export async function createPost(formData: FormData): Promise<void> {
       })
     : [];
 
+  const includesTikTok = accounts.some((account) => account.platform === "tiktok");
+  const hasVideo = media.some((asset) => asset.mimeType.startsWith("video/"));
+  if (includesTikTok && !hasVideo) {
+    redirect("/dashboard/posts?error=tiktok_video_required");
+  }
+
   const isDraft = intent === "draft";
   const runAt = scheduledAtRaw ? new Date(scheduledAtRaw) : new Date();
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AuthError } from "next-auth";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { signIn } from "@/auth";
 
 export default async function LoginPage({
@@ -18,10 +18,9 @@ export default async function LoginPage({
         redirectTo: "/dashboard",
       });
     } catch (err) {
-      if (err instanceof AuthError) {
-        redirect("/login?error=1");
-      }
-      throw err;
+      // Successful sign-in throws a special redirect error that must be rethrown.
+      if (isRedirectError(err)) throw err;
+      redirect("/login?error=1");
     }
   }
 

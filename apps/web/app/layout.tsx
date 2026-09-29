@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Social Suite",
-  description: "Connect, schedule, and publish across your social platforms.",
+  title: "Social Suite Media",
+  description: "Connect official social accounts, publish videos, and track public performance metrics.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

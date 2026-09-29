@@ -16,6 +16,7 @@ export async function handleSyncAnalytics(): Promise<void> {
   });
 
   for (const account of accounts) {
+    if ((account.platformMetadata as { demoMode?: boolean } | null)?.demoMode === true) continue;
     if (!account.credential) continue;
 
     try {
@@ -50,6 +51,8 @@ export async function handleSyncAnalytics(): Promise<void> {
             views: stat.views,
             likes: stat.likes,
             comments: stat.comments,
+            shares: stat.shares ?? 0,
+            favorites: stat.favorites ?? 0,
             subscribersGained: stat.subscribersGained,
             subscribersLost: stat.subscribersLost,
             estimatedMinutesWatched: stat.estimatedMinutesWatched,
@@ -58,6 +61,8 @@ export async function handleSyncAnalytics(): Promise<void> {
             views: stat.views,
             likes: stat.likes,
             comments: stat.comments,
+            shares: stat.shares ?? 0,
+            favorites: stat.favorites ?? 0,
             subscribersGained: stat.subscribersGained,
             subscribersLost: stat.subscribersLost,
             estimatedMinutesWatched: stat.estimatedMinutesWatched,

@@ -137,6 +137,9 @@ export const instagramAdapter: PlatformAdapter = {
   },
 
   async publish(target, credentials) {
+    if (target.media.length > 1) {
+      return { success: false, errorKind: "permanent", errorCode: "unsupported_media_count", errorMessage: "Instagram publishing currently supports one image or video per post." };
+    }
     const asset = target.media[0];
     if (!asset) {
       return {
@@ -145,6 +148,9 @@ export const instagramAdapter: PlatformAdapter = {
         errorCode: "no_media",
         errorMessage: "Instagram posts require an image or video.",
       };
+    }
+    if (!asset.mimeType.startsWith("video/") && !asset.mimeType.startsWith("image/")) {
+      return { success: false, errorKind: "permanent", errorCode: "unsupported_media", errorMessage: "Instagram posts require an image or video." };
     }
 
     const isVideo = asset.mimeType.startsWith("video/");
@@ -254,12 +260,20 @@ export const instagramAdapter: PlatformAdapter = {
       return {
         externalId: item.id,
         title: firstLine || "Untitled",
-        thumbnailUrl: item.thumbnail_url ?? item.media_url,
+        thumbnailUrl: item.thumbnail_url ?? (item.media_type === "VIDEO" ? undefined : item.media_url),
         publishedAt: item.timestamp,
         url: item.permalink,
         likes: item.like_count,
         comments: item.comments_count,
         isShortForm: item.media_product_type === "REELS",
+        mediaKind:
+          item.media_product_type === "REELS"
+            ? "short"
+            : item.media_type === "VIDEO"
+              ? "video"
+              : item.media_type === "IMAGE" || item.media_type === "CAROUSEL_ALBUM"
+                ? "image"
+                : "text",
       } satisfies ContentItem;
     });
   },

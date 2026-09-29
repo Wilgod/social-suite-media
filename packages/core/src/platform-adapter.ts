@@ -7,12 +7,14 @@ import type {
   Platform,
   PlatformAppCredentials,
   PlatformCredentials,
+  PostComment,
+  PostMetrics,
   PublishablePostTarget,
   PublishResult,
 } from "./types";
 
 /**
- * One implementation per platform (youtube/facebook/instagram/threads/x).
+ * One implementation per platform (youtube/facebook/instagram/threads/x/douyin/bilibili/xiaohongshu/tiktok).
  * The OAuth connect/callback routes, token refresh scheduler, and publish worker
  * are all written once against this interface.
  *
@@ -22,7 +24,12 @@ import type {
 export interface PlatformAdapter {
   readonly platform: Platform;
 
-  getAuthorizationUrl(state: string, scopes: string[], appCredentials: PlatformAppCredentials): string;
+  getAuthorizationUrl(
+    state: string,
+    scopes: string[],
+    appCredentials: PlatformAppCredentials,
+    pkceVerifier?: string,
+  ): string;
 
   exchangeCodeForTokens(
     code: string,
@@ -44,4 +51,10 @@ export interface PlatformAdapter {
 
   /** Not every platform/adapter can break performance down by content format (e.g. Shorts vs regular videos) yet. */
   fetchContentFormatBreakdown?(accessToken: string, since: Date): Promise<ContentFormatStat[]>;
+
+  /** Per-post metrics for a video/note already published through this app. */
+  fetchPostMetrics?(externalPostId: string, credentials: PlatformCredentials): Promise<PostMetrics>;
+
+  /** Comment threads on a published post. */
+  fetchComments?(externalPostId: string, credentials: PlatformCredentials): Promise<PostComment[]>;
 }
